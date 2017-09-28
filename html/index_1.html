@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+</head>
+<body>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<!-- <script src="https://d3js.org/d3-color.v1.min.js"></script> -->
+<script src="https://d3js.org/d3-dispatch.v1.min.js"></script>
+<!-- <script src="https://d3js.org/d3-ease.v1.min.js"></script> -->
+<!-- <script src="https://d3js.org/d3-interpolate.v1.min.js"></script> -->
+<!-- <script src="https://d3js.org/d3-selection.v1.min.js"></script> -->
+<!-- <script src="https://d3js.org/d3-timer.v1.min.js"></script> -->
+<!-- <script src="https://d3js.org/d3-transition.v1.min.js"></script> -->
+<script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
+
+<script src="https://unpkg.com/mitt/dist/mitt.umd.js"></script>
+<script type="text/javascript" src="../js/jquery.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+<link type="text/css" rel="stylesheet" href="../css/style.css">
+
+<script>
+
+var core_text = document.location.search;
+core_text = decodeURI(core_text.substring(9, core_text.length));
+var prev_element_id;
+var prev_core_text;
+var prev_core_type;
+
+let emitter = window.mitt();
+var element_map = new Map();
+
+let x_center = 834;
+let y_center = 436;
+let rect_oneside = 13;
+
+var svgGroup;
+var node_data;
+var core_type;
+var element_id;
+
+window.onload = function(){
+  const svgContainer = d3.select('#svg_area').append('svg')
+                  .attr('width', 1664) // 中心：834
+                  .attr('height', 872) // 中心：436
+                  .attr('id', 'bsm_network');
+  createBismarck("../json/sample.json");
+}
+
+const listener = (d) => {
+
+  // 戻るボタン用に値を保持
+  prev_element_id = element_id;
+  prev_core_text = core_text;
+  prev_core_type = core_type;
+
+  element_id = d3.select(event.target).attr("id");
+  var index = element_map.get(parseInt(element_id, 10));
+
+  core_text = node_data[index].label;
+  core_type = node_data[index].type;
+  
+  if (element_id % 2 == 0) {
+    createBismarck("../json/sample_1.json");
+  } else {
+    createBismarck("../json/sample_2.json");
+  }
+
+  $('.kn-detailInfoArea').css('display', 'block');
+
+  // svgContainer.append('line').attrs({
+  //   x1: start.x,
+  //   y1: start.y,
+  //   x2: start.x,
+  //   y2: start.y,
+  //   'stroke-width': 1,
+  //   'stroke': 'gray'
+  // }).transition().duration(500).attrs({
+  //   x2: end.x,
+  //   y2: end.y
+  // }).on('end', () => {
+  //   const circle = svgContainer.append('circle').attrs({
+  //     cx: end.x,
+  //     cy: end.y,
+  //     r: start.r,
+  //     'fill': 'rgb('+randomColor(255)+', '+randomColor(255)+', '+randomColor(255)+')',
+  //     // 'opacity': '0.5'
+  //   })
+  //   emitter.emit('foo', circle)
+  // })
+}
+
+function backToPrev() {
+  if (prev_core_text == null || prev_core_text == "") {
+    return;
+  }
+  core_text = prev_core_text;
+  core_type = prev_core_type;
+  createBismarck("../json/sample.json");
+  $('.kn-detailInfoArea').css('display', 'none');
+}
+
+// divタグの作成とajax通信***********************************************************************
+function createBismarck(json) {
+  d3.selectAll("#bsm_element").remove();
+  svgGroup = d3.select('#bsm_network').append('g')
+                  .attr('id', 'bsm_element');
+  $.ajax({
+          url: json,
+          dataType : 'json'
+        }).done(showBismarck)
+}
+
+// ここから表示用メソッド*************************************************************************
+function showBismarck(data) {
+
+  var rect_angle = -58;
+  var rect_radius = 100;
+
+  // keyword検索用のmapオブジェクトの作成
+  for (var i = 0; i < data.length; i++) {
+    element_map.set(data[i].id, i);
+  }
+
+  var keyword_ids;
+  var keyword_index;
+  var keyword_coordinates;
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i].type != "knowledge") {
+      continue;
+    }
+
+    // knowledgeの表示用の値を設定する
+    data[i].color_red = randomColor(255);
+    data[i].color_green = randomColor(255);
+    data[i].color_blue = randomColor(255);
+    data[i].x = 834 + rect_radius * Math.cos(rect_angle / 180 * Math.PI);
+    data[i].y = 436 + rect_radius * Math.sin(rect_angle / 180 * Math.PI);
+
+    if (i % 2 == 0) {
+      rect_angle = rect_angle + 31;
+      rect_radius = rect_radius + 31;
+    } else {
+      rect_angle = rect_angle + 19;
+      rect_radius = rect_radius - 19;
+    }
+
+    // keyword表示用の値を設定する
+    keyword_ids = data[i].keywords;
+
+    if (keyword_ids != null && keyword_ids.length > 0) {
+
+      for (var j = 0; j < keyword_ids.length; j++) {
+        keyword_index = element_map.get(keyword_ids[j]);
+        
+        if (data[keyword_index].count == 0) {
+          // 色はknowledgeと一緒
+          data[keyword_index].color_red = data[i].color_red;
+          data[keyword_index].color_green = data[i].color_green;
+          data[keyword_index].color_blue = data[i].color_blue;
+
+          // 座標はknowledgeの座標から計算する
+          keyword_coordinates = setKeywordCoordinate(data[i].x, data[i].y, j);
+          data[keyword_index].x = keyword_coordinates[0];
+          data[keyword_index].y = keyword_coordinates[1];
+          
+          data[keyword_index].count++;
+          continue;
+        }
+
+        // 複数のknowledgeに関連するkeywordの場合は色をグレイに設定
+        data[keyword_index].color_red = 128;
+        data[keyword_index].color_green = 128;
+        data[keyword_index].color_blue = 128;
+
+        // 複数のknowledgeに関連するkeywordの場合は中点をx/yに設定する
+        data[keyword_index].x = (data[keyword_index].x + data[i].x) / 2;
+        data[keyword_index].y = (data[keyword_index].y + data[i].y) / 2;
+      }
+    }
+  }
+
+  // knowledgeに紐づかないkeywordの値を設定をする
+  for (var i = 0; i < data.length; i++) {
+    
+    if (data[i].type != "keyword") {
+      continue;
+    }
+    if (data[i].x != null && data[i].x != "" && data[i].y != null && data[i].y != "") {
+      continue;
+    }
+
+    data[i].color_red = randomColor(255);
+    data[i].color_green = randomColor(255);
+    data[i].color_blue = randomColor(255);
+    data[i].x = 834 + rect_radius * Math.cos(rect_angle / 180 * Math.PI);
+    data[i].y = 436 + rect_radius * Math.sin(rect_angle / 180 * Math.PI);
+
+    if (i % 2 == 0) {
+      rect_angle = rect_angle + 31;
+      rect_radius = rect_radius + 13;
+    } else {
+      rect_angle = rect_angle + 19;
+      rect_radius = rect_radius - 11;
+    }
+  }
+
+  node_data = data;
+
+  // ライン表示部分
+  for (var i = 0; i < data.length; i++) {
+
+    // 中心からknowledgeへの線
+    if (data[i].type == "knowledge") {
+      svgGroup.append('line').attrs({
+        x1: x_center,
+        y1: y_center,
+        x2: data[i].x + rect_oneside/2,
+        y2: data[i].y + rect_oneside/2,
+        'stroke-width': 0.1,
+        'stroke': 'gray',
+      });
+
+      // knowledgeからkeywordへの線
+      keyword_ids = data[i].keywords;
+
+      if (keyword_ids == null || keyword_ids == "") {
+        continue;
+      }
+
+      for (var j = 0; j < keyword_ids.length; j++) {
+
+        keyword_index = element_map.get(keyword_ids[j]);
+        svgGroup.append('line').attrs({
+          x1: data[i].x + rect_oneside/2,
+          y1: data[i].y + rect_oneside/2,
+          x2: data[keyword_index].x,
+          y2: data[keyword_index].y,
+          'stroke-width': 0.1,
+          'stroke': 'gray',
+        });
+      }
+    }
+    
+    // 中心からkeywordへの線
+    if (data[i].count == 0) {
+      svgGroup.append('line').attrs({
+        x1: x_center,
+        y1: y_center,
+        x2: data[i].x,
+        y2: data[i].y,
+        'stroke-width': 0.1,
+        'stroke': 'gray',
+      });
+    }
+  }
+
+  // 中心の要素を表示する
+  if (core_type == "keyword") {
+    svgGroup.append('circle').attrs({
+      cx: x_center,
+      cy: y_center,
+      r: 15,
+      'stroke-width': 0.1,
+      'stroke': 'black',
+      'fill': 'white'
+    });
+  } else {
+    svgGroup.append('rect').attrs({
+      x: x_center - 29/2,
+      y: y_center - 29/2,
+      'width': 29,
+      'height': 29,
+      'stroke-width': 0.1,
+      'stroke': 'black',
+      'fill': 'white'
+    });
+  }
+
+  // knowledgeとkeywordを表示する
+  for (var i = 0; i < data.length; i++) {
+
+    if (data[i].type == "knowledge") {
+      svgGroup.append('rect').attrs({
+        'id': data[i].id,
+        x: data[i].x,
+        y: data[i].y,
+        'width': rect_oneside,
+        'height': rect_oneside,
+        'fill': 'rgb('+data[i].color_red+', '+data[i].color_green+', '+data[i].color_blue+')'
+      }).on('click', d => listener(d));
+    } else {
+      svgGroup.append('circle').attrs({
+        'id': data[i].id,
+        cx: data[i].x,
+        cy: data[i].y,
+        r: 1.5,
+        'fill': 'rgb('+data[i].color_red+', '+data[i].color_green+', '+data[i].color_blue+')'
+      }).on('click', d => listener(d));
+    }
+  }
+
+  // knowledgeとkeywordのラベルを表示する
+  for (var i = 0; i < data.length; i++) {
+
+    if (data[i].type == "knowledge") {
+      svgGroup.append('text').attrs({
+        x: data[i].x + rect_oneside * 1.2,
+        y: data[i].y + rect_oneside * 0.8,
+        'font-size': 10,
+        'fill': 'black'
+      }).text(data[i].label);
+    }
+
+    if (data[i].type == "keyword") {
+      svgGroup.append('text').attrs({
+        x: data[i].x + 2,
+        y: data[i].y + 1.4,
+        'font-size': 5,
+        'fill': 'black'
+      }).text(data[i].label);
+    }
+  }
+
+  // 入力したキーワードを表示する
+  svgGroup.append('text').attrs({
+    x: x_center,
+    y: y_center + 29/4,
+    'font-size': 20,
+    'fill': 'black'
+  }).text(core_text);
+
+};
+// ここまで表示用メソッド*************************************************************************
+
+emitter.on('foo', $el => {
+  $el.on('click', d => listener(d))
+});
+
+var circle_angle = 0;
+var circle_radius = 23;
+var x, y;
+var angle_first, range_start, range_end;
+
+function setKeywordCoordinate(x_knowledge, y_knowledge, count) {
+
+  // 第一象限
+  if (x_knowledge >= x_center && y_knowledge <= y_center) {
+    angle_first = 0;
+    range_start = -90;
+    range_end = -80;
+  } else if (x_knowledge <= x_center && y_knowledge <= y_center) {
+  // 第二象限
+    angle_first = -90;
+    range_start = -180;
+    range_end = -170;
+  } else if (x_knowledge <= x_center && y_knowledge >= y_center) {
+  // 第三象限
+    angle_first = 180;
+    range_start = 90;
+    range_end = 100;
+  } else {
+    // 第四象限
+    angle_first = 90;
+    range_start = 0;
+    range_end = 10;
+  }
+
+  if (count == 0 || circle_angle > angle_first) {
+    circle_radius = 23;
+    circle_angle = randomRange(range_start, range_end);
+  }
+
+  x = x_knowledge + rect_oneside/2 + circle_radius * Math.cos(circle_angle / 180 * Math.PI);
+  y = y_knowledge + rect_oneside/2 + circle_radius * Math.sin(circle_angle / 180 * Math.PI);
+  
+  if (count % 2 == 0) {
+    circle_angle = circle_angle + 20;
+    circle_radius = circle_radius + 0.7;
+  } else {
+    circle_angle = circle_angle + 15;
+    circle_radius = circle_radius + 0.9;
+  }
+
+  return [x, y];
+}
+
+function randomColor() {
+  return Math.floor(Math.random() * (255));
+};
+
+function randomRange(start, end) {
+  return Math.floor(Math.random()*(end-start)+start);
+};
+
+function closeDetailWindow() {
+  $('.kn-detailInfoArea').css('display', 'none');
+};
+
+</script>
+
+<div class="col-2 kn-searchArea">
+  <div class="kn-searchArea__logo">
+    <label>Bismarck</label>  
+  </div>
+  <form action="index_1.html" method="get">
+    <div class="kn-searchArea__form row">    
+      <div class="kn-searchArea__text">
+        <input class="form-control kn-searchArea__textSize" type="text" placeholder="Enter keyword..." name="keyword">
+      </div>
+      <div class="kn-searchArea__button">
+        <button type="submit" class="btn btn-outline-info kn-searchArea__textSize">Go</button>  
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="kn-backButtonArea">
+  <button type="button" class="btn btn-outline-secondary kn-backButtonArea__button" onclick="backToPrev()"><</button>
+</div>
+
+<div class="col-3 kn-detailInfoArea" id="kn-detailInfoArea">
+  <div class="kn-detailInfoArea__label">
+    <label>More Information...</label>  
+  </div>
+  <div class="kn-detailInfoArea__closeButton">
+    <button type="button" class="close" aria-label="Close" onclick="closeDetailWindow()">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+  <div class="kn-detailInfoArea__context">
+    <div>
+      <div class="kn-detailInfoArea__img">
+        <img src="../img/picture_react.jpeg" style="width: 100%">
+      </div>
+      <div class="kn-detailInfoArea__title">
+        <label>入門 React――コンポーネントベースのWebフロントエンド開発</label>
+      </div>      
+    </div>
+    <div class="kn-detailInfoArea__table">
+      <table>
+        <tr>
+          <td class="kn-detailInfoArea__th">著者</td>
+          <td class="kn-detailInfoArea__td">Frankie Bagnardi、Jonathan Beebe、Richard Feldman、Tom Hallett、Simon Hojberg、Karl Mikkelsen</td>
+        </tr>
+        <tr>
+          <td class="kn-detailInfoArea__th">発行年月日</td>
+          <td class="kn-detailInfoArea__td">2015年04月</td>
+        </tr>
+        <tr>
+          <td class="kn-detailInfoArea__th">ページ数</td>
+          <td class="kn-detailInfoArea__td">280</td>
+        </tr>
+        <tr>
+          <td class="kn-detailInfoArea__th">内容</td>
+          <td class="kn-detailInfoArea__td">Facebookが開発したJavaScriptライブラリ「React」の解説書。本書では、サンプルアプリケーションを用いてReact.jsのすべての側面を解説します。「第I部 基礎」でReactコンポーネントの作成と合成を学び、Reactの基本的な使い方を理解します。「第II部 応用」ではワンランク上のコンポーネント作成について学びます。「第III部 ツール」ではReactと共に使用して堅牢なアプリケーションを実装するためのツールについて学びます。最後の「第IV部 実践」では大規模なアプリケーション開発に必要な知識やWeb以外のユースケースについて解説します。読者はコンポーネントベースの最新のフロントエンド開発についての体系的な知識と技術を身につけることができます。日本語翻訳版の本書ではReactの開発環境の構築手順とAPIリファレンスを巻末付録として収録。</td>
+        </tr>
+      </table>  
+    </div>
+  </div>
+</div>
+
+<div id="svg_area"></div>
+
+</body>
+</html>

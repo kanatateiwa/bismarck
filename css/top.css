@@ -1,0 +1,26 @@
+.kn-searchArea {
+	margin: 15rem auto;
+    background-color: #fff;
+}
+
+.kn-searchArea__logo {
+	width: 100%;
+	text-align: center;
+	font-size: 4rem;
+}
+
+.kn-searchArea__form {
+}
+
+.kn-searchArea__text {
+	width: 100%;
+}
+
+.kn-searchArea__textSize {
+	font-size: 1rem;
+}
+
+.kn-searchArea__button {
+	float: right;
+	margin: 0.5rem 0;
+}
