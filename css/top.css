@@ -18,6 +18,7 @@
 
 .kn-searchArea__textSize {
 	font-size: 1rem;
+	cursor: pointer;
 }
 
 .kn-searchArea__button {
