@@ -26,6 +26,7 @@
 
 .kn-searchArea__textSize {
 	font-size: 0.8rem;
+	cursor : pointer;
 }
 
 .kn-searchArea__button {
@@ -108,4 +109,12 @@
 .kn-backButtonArea__button {
     border-color: white;
     font-size: 0.5rem;
+}
+
+.kn-node {
+	cursor : pointer;
+}
+
+.kn-node__center {
+	pointer-events : none;
 }

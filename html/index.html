@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Document</title>
+  <title>Bismark</title>
 </head>
 <body>
 
@@ -41,6 +41,12 @@ var node_data;
 var core_type;
 var element_id;
 
+var selected_color_red = 255;
+var selected_color_green = 255;
+var selected_color_blue = 255;
+var selected_x = x_center;
+var selected_y = y_center;
+
 window.onload = function(){
   const svgContainer = d3.select('#svg_area').append('svg')
                   .attr('width', 1664) // 中心：834
@@ -56,11 +62,18 @@ const listener = (d) => {
   prev_core_text = core_text;
   prev_core_type = core_type;
 
+  // 中心に表示する要素の値を取得
   element_id = d3.select(event.target).attr("id");
   var index = element_map.get(parseInt(element_id, 10));
 
   core_text = node_data[index].label;
   core_type = node_data[index].type;
+
+  selected_color_red = node_data[index].color_red;
+  selected_color_green = node_data[index].color_green;
+  selected_color_blue = node_data[index].color_blue;
+  selected_x = node_data[index].x;
+  selected_y = node_data[index].y;
   
   if (element_id % 2 == 0) {
     createBismarck("../json/sample_1.json");
@@ -96,8 +109,9 @@ function backToPrev() {
   if (prev_core_text == null || prev_core_text == "") {
     return;
   }
+
   core_text = prev_core_text;
-  core_type = prev_core_type;
+  core_type = 'prev';
   createBismarck("../json/sample.json");
   $('.kn-detailInfoArea').css('display', 'none');
 }
@@ -124,9 +138,9 @@ function showBismarck(data) {
     element_map.set(data[i].id, i);
   }
 
-  var keyword_ids;
-  var keyword_index;
-  var keyword_coordinates;
+  var relations;
+  var relation_index;
+  var keyword_coordinate;
 
   for (var i = 0; i < data.length; i++) {
     if (data[i].type != "knowledge") {
@@ -149,36 +163,36 @@ function showBismarck(data) {
     }
 
     // keyword表示用の値を設定する
-    keyword_ids = data[i].keywords;
+    relations = data[i].relations;
 
-    if (keyword_ids != null && keyword_ids.length > 0) {
+    if (relations != null && relations.length > 0) {
 
-      for (var j = 0; j < keyword_ids.length; j++) {
-        keyword_index = element_map.get(keyword_ids[j]);
+      for (var j = 0; j < relations.length; j++) {
+        relation_index = element_map.get(relations[j].id);
         
-        if (data[keyword_index].count == 0) {
+        if (data[relation_index].type == "keyword" && data[relation_index].count == 0) {
           // 色はknowledgeと一緒
-          data[keyword_index].color_red = data[i].color_red;
-          data[keyword_index].color_green = data[i].color_green;
-          data[keyword_index].color_blue = data[i].color_blue;
+          data[relation_index].color_red = data[i].color_red;
+          data[relation_index].color_green = data[i].color_green;
+          data[relation_index].color_blue = data[i].color_blue;
 
           // 座標はknowledgeの座標から計算する
-          keyword_coordinates = setKeywordCoordinate(data[i].x, data[i].y, j);
-          data[keyword_index].x = keyword_coordinates[0];
-          data[keyword_index].y = keyword_coordinates[1];
+          keyword_coordinate = setKeywordCoordinate(data[i].x, data[i].y, j);
+          data[relation_index].x = keyword_coordinate[0];
+          data[relation_index].y = keyword_coordinate[1];
           
-          data[keyword_index].count++;
+          data[relation_index].count++;
           continue;
+        } else if (data[relation_index].type == "keyword" && data[relation_index].count != 0) {
+          // 複数のknowledgeに関連するkeywordの場合は色をグレイに設定
+          data[relation_index].color_red = 128;
+          data[relation_index].color_green = 128;
+          data[relation_index].color_blue = 128;
+
+          // 複数のknowledgeに関連するkeywordの場合は中点をx/yに設定する
+          data[relation_index].x = (data[relation_index].x + data[i].x) / 2;
+          data[relation_index].y = (data[relation_index].y + data[i].y) / 2;
         }
-
-        // 複数のknowledgeに関連するkeywordの場合は色をグレイに設定
-        data[keyword_index].color_red = 128;
-        data[keyword_index].color_green = 128;
-        data[keyword_index].color_blue = 128;
-
-        // 複数のknowledgeに関連するkeywordの場合は中点をx/yに設定する
-        data[keyword_index].x = (data[keyword_index].x + data[i].x) / 2;
-        data[keyword_index].y = (data[keyword_index].y + data[i].y) / 2;
       }
     }
   }
@@ -215,68 +229,145 @@ function showBismarck(data) {
 
     // 中心からknowledgeへの線
     if (data[i].type == "knowledge") {
-      svgGroup.append('line').attrs({
+      svgGroup.append('line').transition().delay(500).attrs({
         x1: x_center,
         y1: y_center,
+        x2: x_center,
+        y2: y_center,
+        'stroke-width': data[i].weight / 30,
+        'stroke': 'silver'
+      }).transition().duration(1000).attrs({
         x2: data[i].x + rect_oneside/2,
-        y2: data[i].y + rect_oneside/2,
-        'stroke-width': 0.1,
-        'stroke': 'gray',
+        y2: data[i].y + rect_oneside/2
       });
 
       // knowledgeからkeywordへの線
-      keyword_ids = data[i].keywords;
+      relations = data[i].relations;
 
-      if (keyword_ids == null || keyword_ids == "") {
+      if (relations == null || relations == "") {
         continue;
       }
 
-      for (var j = 0; j < keyword_ids.length; j++) {
+      for (var j = 0; j < relations.length; j++) {
 
-        keyword_index = element_map.get(keyword_ids[j]);
-        svgGroup.append('line').attrs({
-          x1: data[i].x + rect_oneside/2,
-          y1: data[i].y + rect_oneside/2,
-          x2: data[keyword_index].x,
-          y2: data[keyword_index].y,
-          'stroke-width': 0.1,
-          'stroke': 'gray',
-        });
+        relation_index = element_map.get(relations[j].id);
+
+        if (data[relation_index].type == "keyword") {
+          svgGroup.append('line').transition().delay(500).attrs({
+            x1: data[i].x + rect_oneside/2,
+            y1: data[i].y + rect_oneside/2,
+            x2: data[i].x + rect_oneside/2,
+            y2: data[i].y + rect_oneside/2,
+            'stroke-width': relations[j].weight / 30,
+            'stroke': 'silver'
+          }).transition().duration(1000).attrs({
+            x2: data[relation_index].x,
+            y2: data[relation_index].y
+          });          
+        } else {
+          svgGroup.append('line').transition().delay(500).attrs({
+            x1: data[i].x + rect_oneside/2,
+            y1: data[i].y + rect_oneside/2,
+            x2: data[i].x + rect_oneside/2,
+            y2: data[i].y + rect_oneside/2,
+            'stroke-width': relations[j].weight / 30,
+            'stroke': 'silver'
+          }).transition().duration(1000).attrs({
+            x2: data[relation_index].x + rect_oneside/2,
+            y2: data[relation_index].y + rect_oneside/2
+          }); 
+        }
+        
       }
     }
     
     // 中心からkeywordへの線
     if (data[i].count == 0) {
-      svgGroup.append('line').attrs({
+      svgGroup.append('line').transition().delay(500).attrs({
         x1: x_center,
         y1: y_center,
+        x2: x_center,
+        y2: y_center,
+        'stroke-width': data[i].weight / 30,
+        'stroke': 'silver'
+      }).transition().duration(1000).attrs({
         x2: data[i].x,
-        y2: data[i].y,
-        'stroke-width': 0.1,
-        'stroke': 'gray',
-      });
+        y2: data[i].y
+      }); 
     }
   }
 
   // 中心の要素を表示する
   if (core_type == "keyword") {
     svgGroup.append('circle').attrs({
+      cx: selected_x,
+      cy: selected_y,
+      r: 1.5,
+      'fill': 'rgb('+selected_color_red+', '+selected_color_green+', '+selected_color_blue+')'
+    }).transition().duration(1000).attrs({
+      'class': 'kn-node__center',
       cx: x_center,
       cy: y_center,
       r: 15,
       'stroke-width': 0.1,
-      'stroke': 'black',
-      'fill': 'white'
+      'stroke': 'black'
     });
-  } else {
+  } else if (core_type == "knowledge") {
     svgGroup.append('rect').attrs({
+      x: selected_x,
+      y: selected_y,
+      'width': rect_oneside,
+      'height': rect_oneside,
+      'fill': 'rgb('+selected_color_red+', '+selected_color_green+', '+selected_color_blue+')'
+    }).transition().duration(1000).attrs({
+      'class': 'kn-node__center',
       x: x_center - 29/2,
       y: y_center - 29/2,
       'width': 29,
       'height': 29,
       'stroke-width': 0.1,
-      'stroke': 'black',
+      'stroke': 'black'
+    });
+  } else if (core_type == "prev") {
+
+    if (prev_core_type == "keyword") {
+      svgGroup.append('circle').attrs({
+        'class': 'kn-node__center',
+        cx: x_center,
+        cy: y_center,
+        r: 15,
+        'stroke-width': 0.1,
+        'stroke': 'white',
+        'fill': 'white'
+      }).transition().delay(1000).duration(1000).attrs({
+        'stroke': 'black'
+      });
+    } else {
+      svgGroup.append('rect').attrs({
+        'class': 'kn-node__center',
+        x: x_center - 29/2,
+        y: y_center - 29/2,
+        'width': 29,
+        'height': 29,
+        'stroke-width': 0.1,
+        'stroke': 'white',
+        'fill': 'white'
+      }).transition().delay(1000).duration(1000).attrs({
+        'stroke': 'black'
+      });
+    }
+  }  else {
+    svgGroup.append('rect').attrs({
+      'class': 'kn-node__center',
+      x: x_center - 29/2,
+      y: y_center - 29/2,
+      'width': 29,
+      'height': 29,
+      'stroke-width': 0.1,
+      'stroke': 'white',
       'fill': 'white'
+    }).transition().delay(1000).duration(1000).attrs({
+      'stroke': 'black'
     });
   }
 
@@ -284,22 +375,28 @@ function showBismarck(data) {
   for (var i = 0; i < data.length; i++) {
 
     if (data[i].type == "knowledge") {
-      svgGroup.append('rect').attrs({
+      svgGroup.append('rect').transition().delay(2000).attrs({
         'id': data[i].id,
+        'class': 'kn-node',
         x: data[i].x,
         y: data[i].y,
         'width': rect_oneside,
         'height': rect_oneside,
         'fill': 'rgb('+data[i].color_red+', '+data[i].color_green+', '+data[i].color_blue+')'
-      }).on('click', d => listener(d));
+      });
+
+      d3.selectAll('rect').on('click', d => listener(d));
     } else {
-      svgGroup.append('circle').attrs({
+      svgGroup.append('circle').transition().delay(2000).attrs({
         'id': data[i].id,
+        'class': 'kn-node',
         cx: data[i].x,
         cy: data[i].y,
         r: 1.5,
         'fill': 'rgb('+data[i].color_red+', '+data[i].color_green+', '+data[i].color_blue+')'
-      }).on('click', d => listener(d));
+      });
+
+      d3.selectAll('circle').on('click', d => listener(d));
     }
   }
 
@@ -307,7 +404,9 @@ function showBismarck(data) {
   for (var i = 0; i < data.length; i++) {
 
     if (data[i].type == "knowledge") {
-      svgGroup.append('text').attrs({
+      svgGroup.append('text').transition().delay(2000).attrs({
+        'id': data[i].id,
+        'class': 'kn-node',
         x: data[i].x + rect_oneside * 1.2,
         y: data[i].y + rect_oneside * 0.8,
         'font-size': 10,
@@ -316,7 +415,9 @@ function showBismarck(data) {
     }
 
     if (data[i].type == "keyword") {
-      svgGroup.append('text').attrs({
+      svgGroup.append('text').transition().delay(2000).attrs({
+        'id': data[i].id,
+        'class': 'kn-node',
         x: data[i].x + 2,
         y: data[i].y + 1.4,
         'font-size': 5,
@@ -325,13 +426,40 @@ function showBismarck(data) {
     }
   }
 
+  d3.selectAll('text').on('click', d => listener(d));
+
   // 入力したキーワードを表示する
-  svgGroup.append('text').attrs({
-    x: x_center,
-    y: y_center + 29/4,
-    'font-size': 20,
-    'fill': 'black'
-  }).text(core_text);
+  if (core_type == "knowledge") {
+    svgGroup.append('text').attrs({
+      x: selected_x + rect_oneside * 1.2,
+      y: selected_y + rect_oneside * 0.8,
+      'font-size': 10,
+      'fill': 'black'
+    }).text(core_text).transition().duration(1000).attrs({
+      x: x_center,
+      y: y_center + 29/4,
+      'font-size': 20,
+    });
+  } else if (core_type == "keyword") {
+    svgGroup.append('text').attrs({
+      x: selected_x + 2,
+      y: selected_y + 1.4,
+      'font-size': 5,
+      'fill': 'black'
+    }).text(core_text).transition().duration(1000).attrs({
+      x: x_center,
+      y: y_center + 29/4,
+      'font-size': 20,
+    });
+  } else {
+    core_type = prev_core_type;
+    svgGroup.append('text').attrs({
+      x: x_center,
+      y: y_center + 29/4,
+      'font-size': 20,
+      'fill': 'black'
+    }).text(core_text);
+  }
 
 };
 // ここまで表示用メソッド*************************************************************************
@@ -406,7 +534,7 @@ function closeDetailWindow() {
   <div class="kn-searchArea__logo">
     <label>Bismarck</label>  
   </div>
-  <form action="index_1.html" method="get">
+  <form action="index.html" method="get">
     <div class="kn-searchArea__form row">    
       <div class="kn-searchArea__text">
         <input class="form-control kn-searchArea__textSize" type="text" placeholder="Enter keyword..." name="keyword">
